@@ -1,154 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PayHero NCBA Test</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-        body {
-            background-color: #f4f6f8;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 15px;
-        }
-        .card {
-            background: white;
-            padding: 25px 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-        }
-        h2 {
-            color: #1a1a2e;
-            text-align: center;
-            margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 1.5rem;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 6px;
-            color: #333;
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-        input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        input:focus {
-            border-color: #00a884;
-        }
-        /* This is the container where PayHero will inject the button */
-        #payHeroContainer {
-            margin-top: 20px;
-            min-height: 50px;
-        }
-        .note {
-            margin-top: 20px;
-            font-size: 0.8rem;
-            color: #666;
-            text-align: center;
-            line-height: 1.4;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PayHero NCBA Test</title>
+<style>
+  * { box-sizing: border-box; font-family: -apple-system, sans-serif; }
+  body { background: #f4f6f8; display: flex; justify-content: center;
+         align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+  .card { background: #fff; padding: 25px 20px; border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+  h2 { text-align: center; color: #1a1a2e; margin-top: 0; }
+  label { display: block; margin: 12px 0 6px; font-weight: 500; font-size: 0.9rem; }
+  input { width: 100%; padding: 12px; border: 1px solid #ddd;
+          border-radius: 8px; font-size: 1rem; }
+  input:focus { border-color: #00a884; outline: none; }
+  button { width: 100%; padding: 14px; margin-top: 20px; background: #00a884;
+           color: white; border: none; border-radius: 8px; font-size: 1rem;
+           font-weight: 600; cursor: pointer; }
+  button:disabled { background: #999; }
+  #status { margin-top: 15px; padding: 12px; border-radius: 8px;
+            font-size: 0.9rem; text-align: center; display: none; }
+  .success { background: #d4edda; color: #155724; }
+  .error { background: #f8d7da; color: #721c24; }
+  .info { background: #d1ecf1; color: #0c5460; }
+  .note { margin-top: 15px; font-size: 0.8rem; color: #666; text-align: center; }
+</style>
 </head>
 <body>
+<div class="card">
+  <h2>NCBA Bank Test</h2>
+  <label for="phone">Phone Number (M-Pesa)</label>
+  <input type="tel" id="phone" placeholder="254712345678" value="254714772901">
 
-    <div class="card">
-        <h2>NCBA Bank Test</h2>
-        
-        <div class="form-group">
-            <label for="phone">Phone Number (M-Pesa)</label>
-            <input type="tel" id="phone" placeholder="e.g., 254712345678" value="">
-        </div>
-        
-        <div class="form-group">
-            <label for="amount">Amount (KES)</label>
-            <input type="number" id="amount" placeholder="e.g., 10" value="10" min="1">
-        </div>
+  <label for="amount">Amount (KES)</label>
+  <input type="number" id="amount" value="10" min="1">
 
-        <!-- PayHero SDK will place the payment button inside this div -->
-        <div id="payHeroContainer"></div>
-        
-        <p class="note">
-            Ensure your Service Wallet is topped up before testing.
-        </p>
-    </div>
+  <button id="payBtn" onclick="payNow()">Pay Now</button>
+  <div id="status"></div>
+  <p class="note">Ensure your PayHero Service Wallet is topped up.</p>
+</div>
 
-    <!-- 1. Include the PayHero SDK Script -->
-    <script src="https://applet.payherokenya.com/cdn/button_sdk.js"></script>
+<script>
+// ===============================================
+// PASTE YOUR PAYHERO CREDENTIALS HERE
+// ===============================================
+const PAYHERO_USERNAME = "caint";      // PayHero username
+const PAYHERO_PASSWORD = "Solitei@2005";       // API Key / Password
+const PAYHERO_CHANNEL_ID = 13586;                     // Your NCBA Channel ID
+// ===============================================
 
-    <!-- 2. Initialize the Payment Widget -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            
-            // ============================================
-            // PASTE YOUR CREDENTIALS HERE
-            // ============================================
-            const MY_LIPWA_LINK = "https://lipwa.link/12806"; // REPLACE WITH YOUR ACTUAL LIPWA LINK
-            const MY_NCBA_CHANNEL_ID = 13586; // REPLACE WITH YOUR NCBA CHANNEL ID
-            // ============================================
+function showStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = 'block';
+}
 
-            // Function to init or update the widget
-            function initPayHero() {
-                const phoneInput = document.getElementById('phone').value;
-                const amountInput = document.getElementById('amount').value;
+async function payNow() {
+  const phone = document.getElementById('phone').value.trim();
+  const amount = document.getElementById('amount').value.trim();
+  const btn = document.getElementById('payBtn');
 
-                // Basic validation
-                if (!phoneInput || !amountInput) {
-                    return; // Don't init if fields are empty
-                }
+  if (!phone || !amount) {
+    showStatus('Please enter phone and amount', 'error');
+    return;
+  }
 
-                // Clear previous widget instance if it exists
-                const container = document.getElementById('payHeroContainer');
-                container.innerHTML = ''; 
+  btn.disabled = true;
+  btn.textContent = 'Sending STK Push...';
+  showStatus('Sending request to PayHero...', 'info');
 
-                // Initialize PayHero Button
-                PayHero.init({
-                    paymentUrl: MY_LIPWA_LINK,
-                    width: "100%",
-                    height: "50px",
-                    containerId: "payHeroContainer",
-                    channelID: MY_NCBA_CHANNEL_ID,
-                    amount: parseInt(amountInput, 10),
-                    phone: phoneInput, // Phone number from the input field
-                    reference: "TEST-" + Date.now(), // Unique reference for each test
-                    name: "Test User",
-                    buttonName: "Pay Now", // Text on the button
-                    buttonColor: "#00a884", // Green color
-                    successUrl: window.location.href, // Redirect to same page on success
-                    failedUrl: window.location.href    // Redirect to same page on failure
-                });
-            }
+  const auth = btoa(`${PAYHERO_USERNAME}:${PAYHERO_PASSWORD}`);
 
-            // Initialize immediately on load (uses the default value in the input)
-            // Note: We need a slight delay to ensure the input values are set
-            setTimeout(initPayHero, 100);
+  const payload = {
+    amount: Number(amount),
+    phone_number: phone,
+    channel_id: PAYHERO_CHANNEL_ID,
+    provider: 'm-pesa',
+    external_reference: 'TEST-' + Date.now(),
+    callback_url: 'https://your-callback-url.com/callback' // optional
+  };
 
-            // Optional: Re-initialize when inputs change if you want a dynamic button
-            // (Often not strictly necessary, but useful for testing)
-            document.getElementById('phone').addEventListener('input', function() {
-                // Debounce this or just click the button again if needed
-            });
-        });
-    </script>
+  try {
+    const res = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
 
+    const data = await res.json();
+    console.log('PayHero response:', data);
+
+    if (res.ok && (data.success || data.status === 'QUEUED' || data.reference)) {
+      showStatus('✅ STK Push sent! Check your phone and enter PIN.', 'success');
+    } else {
+      showStatus('❌ ' + (data.message || data.error || 'Request failed'), 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showStatus('❌ Network error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Pay Now';
+  }
+}
+</script>
 </body>
-  </html>
+</html>
