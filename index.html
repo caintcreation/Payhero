@@ -42,13 +42,8 @@
 </div>
 
 <script>
-// ===============================================
-// PASTE YOUR PAYHERO CREDENTIALS HERE
-// ===============================================
-const PAYHERO_USERNAME = "caint";      // PayHero username
-const PAYHERO_PASSWORD = "Solitei@2005";       // API Key / Password
-const PAYHERO_CHANNEL_ID = 13586;                     // Your NCBA Channel ID
-// ===============================================
+// Set this to your deployed Vercel URL after backend deployment.
+const PAYMENTS_API_URL = 'https://YOUR-VERCEL-PROJECT.vercel.app/api/payments';
 
 function showStatus(msg, type) {
   const el = document.getElementById('status');
@@ -57,52 +52,101 @@ function showStatus(msg, type) {
   el.style.display = 'block';
 }
 
+function normalizeKenyanPhone(phoneInput) {
+  const cleaned = String(phoneInput || '').replace(/\s+/g, '').replace(/^\+/, '');
+
+  if (/^07\d{8}$/.test(cleaned) || /^01\d{8}$/.test(cleaned)) {
+    return '254' + cleaned.slice(1);
+  }
+
+  if (/^2547\d{8}$/.test(cleaned) || /^2541\d{8}$/.test(cleaned)) {
+    return cleaned;
+  }
+
+  return null;
+}
+
+function parseAmount(rawAmount) {
+  const amount = Number(rawAmount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  return amount;
+}
+
+async function parseApiResponse(response) {
+  const bodyText = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    try {
+      return { data: JSON.parse(bodyText), raw: bodyText, isJson: true };
+    } catch (error) {
+      return { data: {}, raw: bodyText, isJson: false };
+    }
+  }
+
+  try {
+    return { data: JSON.parse(bodyText), raw: bodyText, isJson: true };
+  } catch (error) {
+    return { data: {}, raw: bodyText, isJson: false };
+  }
+}
+
 async function payNow() {
-  const phone = document.getElementById('phone').value.trim();
-  const amount = document.getElementById('amount').value.trim();
+  const phoneInput = document.getElementById('phone').value.trim();
+  const amountInput = document.getElementById('amount').value.trim();
   const btn = document.getElementById('payBtn');
 
-  if (!phone || !amount) {
-    showStatus('Please enter phone and amount', 'error');
+  const phone = normalizeKenyanPhone(phoneInput);
+  if (!phone) {
+    showStatus('Please enter a valid Kenyan phone number (e.g. 254712345678).', 'error');
+    return;
+  }
+
+  const amount = parseAmount(amountInput);
+  if (amount === null) {
+    showStatus('Please enter a valid amount greater than 0.', 'error');
     return;
   }
 
   btn.disabled = true;
   btn.textContent = 'Sending STK Push...';
-  showStatus('Sending request to PayHero...', 'info');
-
-  const auth = btoa(`${PAYHERO_USERNAME}:${PAYHERO_PASSWORD}`);
+  showStatus('Sending request to payments backend...', 'info');
 
   const payload = {
-    amount: Number(amount),
+    amount,
     phone_number: phone,
-    channel_id: PAYHERO_CHANNEL_ID,
-    provider: 'm-pesa',
-    external_reference: 'TEST-' + Date.now(),
-    callback_url: 'https://your-callback-url.com/callback' // optional
+    external_reference: 'TEST-' + Date.now()
   };
 
   try {
-    const res = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
+    const res = await fetch(PAYMENTS_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json();
-    console.log('PayHero response:', data);
+    const parsed = await parseApiResponse(res);
+    const data = parsed.data || {};
 
-    if (res.ok && (data.success || data.status === 'QUEUED' || data.reference)) {
+    if (res.ok && (data.success || data.status === 'QUEUED' || data.reference || data.CheckoutRequestID)) {
       showStatus('✅ STK Push sent! Check your phone and enter PIN.', 'success');
-    } else {
-      showStatus('❌ ' + (data.message || data.error || 'Request failed'), 'error');
+      return;
     }
+
+    const backendMessage = data.error || data.message || data.details || data.upstream_error;
+    const fallback = parsed.isJson
+      ? `Request failed (${res.status})`
+      : `Request failed (${res.status}): ${parsed.raw || 'Non-JSON response from backend'}`;
+
+    showStatus('❌ ' + (backendMessage || fallback), 'error');
   } catch (err) {
     console.error(err);
-    showStatus('❌ Network error: ' + err.message, 'error');
+    showStatus('❌ Network error: ' + (err && err.message ? err.message : 'Request could not be completed'), 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Pay Now';
